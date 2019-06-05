@@ -1,5 +1,9 @@
 2019-06-05  Jeremy Bennett  <jeremy.bennett@embecosm.com>
 
+	* build-gdbserver.sh: Change name of gdbserver source dir.
+
+2019-06-05  Jeremy Bennett  <jeremy.bennett@embecosm.com>
+
 	* build-gdbserver.sh: Correct typo in gdbserver config, copy
 	header messages to log.
 	* build-gnu.sh: Export PATH, enable plugins, more explicit newlib

@@ -31,7 +31,7 @@ cd ${rootdir}/build/gdbserver
 echo -n "Configuring GDBserver..."
 echo "Configuring GDBserver" >> ${rootdir}/logs/gdbserver-build.log 2>&1
 
-if ! ${rootdir}/riscv-gdbserver/configure \
+if ! ${rootdir}/gdbserver/configure \
      --with-verilator-headers=/opt/verilator/share/verilator/include \
      --with-ri5cy-modeldir=${rootdir}/ri5cy/verilator-model/obj_dir \
      --with-binutils-incdir= \
