@@ -1,3 +1,13 @@
+2019-06-05  Jeremy Bennett  <jeremy.bennett@embecosm.com>
+
+	* build-gdbserver.sh: Correct typo in gdbserver config, copy
+	header messages to log.
+	* build-gnu.sh: Export PATH, enable plugins, more explicit newlib
+	build options.
+	* build-llvm.sh: Build as release compiler, optimize tablegen,
+	enble assertions, link clang/clang++ to target specific versions.
+	* size-data.sh: Created.
+
 2019-05-27  Jeremy Bennett  <jeremy.bennett@embecosm.com>
 
 	* .gitignore: Created.
