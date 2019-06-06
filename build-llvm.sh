@@ -15,6 +15,8 @@ else
     parallel=""
 fi
 
+monorepo="monorepo/"
+
 # Clang/LLVM
 
 cd ${rootdir}/build/llvm
@@ -32,7 +34,8 @@ if ! cmake \
      -DLLVM_EXPERIMENTAL_TARGETS_TO_BUILD=RISCV  \
      -DLLVM_BINUTILS_INCDIR=/${rootdir}/gnu/binutils-gdb/include \
      -DLLVM_ENABLE_THREADS=OFF \
-     -G Ninja ${rootdir}/llvm/llvm >> ${rootdir}/logs/llvm-build.log 2>&1
+     -G Ninja ${rootdir}/llvm/${monorepo}llvm \
+     >> ${rootdir}/logs/llvm-build.log 2>&1
 then
     echo "failed"
     exit 1

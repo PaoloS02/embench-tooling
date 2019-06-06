@@ -1,5 +1,9 @@
 2019-06-06  Jeremy Bennett  <jeremy.bennett@embecosm.com>
 
+	* build-llvm.sh: Provide opportunity to build from monorepo.
+
+2019-06-06  Jeremy Bennett  <jeremy.bennett@embecosm.com>
+
 	* build-gdbserver.sh: Vary parallelism depending on whether on
 	laptop, flexibility about location of verilator headers.
 	* build-gnu.sh: Vary parallelism depending on whether on
