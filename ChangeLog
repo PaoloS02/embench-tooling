@@ -1,3 +1,14 @@
+2019-06-06  Jeremy Bennett  <jeremy.bennett@embecosm.com>
+
+	* build-gdbserver.sh: Vary parallelism depending on whether on
+	laptop, flexibility about location of verilator headers.
+	* build-gnu.sh: Vary parallelism depending on whether on
+	laptop, specify arch and abi at top of script, specify C flags
+	for newlib at top of script.
+	* build-llvm.sh: Vary parallelism depending on whether on
+	laptop, Record start of building in log file.
+	* speed-data.sh: Created.
+
 2019-06-05  Jeremy Bennett  <jeremy.bennett@embecosm.com>
 
 	* build-gdbserver.sh: Change name of gdbserver source dir.

@@ -13,6 +13,20 @@ touch ${rootdir}/logs/gnu-build.log
 
 export PATH=${rootdir}/install/bin:${PATH}
 
+if [ "$(hostname)" = "longley" ]
+then
+    parallel="-j 4"
+else
+    parallel="-j $(nproc)"
+fi
+
+
+arch=rv32imc
+abi=ilp32
+#arch=rv32emc
+#abi=ilp32e
+cflags_for_target="-DPREFER_SIZE_OVER_SPEED=1 -Os -march=${arch} -mabi=${abi}"
+
 # Binutils/GDB
 
 cd ${rootdir}/build/gnu/binutils-gdb
@@ -49,7 +63,7 @@ fi
 echo -n "Building Binutils/GDB..."
 echo "Building Binutils/GDB" >> ${rootdir}/logs/gnu-build.log 2>&1
 
-if ! make -j 4 >> ${rootdir}/logs/gnu-build.log 2>&1
+if ! make ${parallel} >> ${rootdir}/logs/gnu-build.log 2>&1
 then
     echo "failed"
     exit 1
@@ -60,7 +74,7 @@ fi
 echo -n "Installing Binutils/GDB..."
 echo "Installing Binutils/GDB" >> ${rootdir}/logs/gnu-build.log 2>&1
 
-if ! make -j 4 install >> ${rootdir}/logs/gnu-build.log 2>&1
+if ! make ${parallel} install >> ${rootdir}/logs/gnu-build.log 2>&1
 then
     echo "failed"
     exit 1
@@ -104,8 +118,8 @@ if ! ${rootdir}/gnu/gcc/configure \
      --without-isl \
      --without-cloog \
      --disable-decimal-float \
-     --with-arch=rv32imac \
-     --with-abi=ilp32 \
+     --with-arch=${arch} \
+     --with-abi=${abi} \
      --enable-languages=c \
      --without-headers \
      --with-newlib \
@@ -123,7 +137,7 @@ fi
 echo -n "Building GCC Stage 1..."
 echo "Building GCC Stage 1" >> ${rootdir}/logs/gnu-build.log 2>&1
 
-if ! make -j 4 all-gcc >> ${rootdir}/logs/gnu-build.log 2>&1
+if ! make ${parallel} all-gcc >> ${rootdir}/logs/gnu-build.log 2>&1
 then
     echo "failed"
     exit 1
@@ -134,7 +148,7 @@ fi
 echo -n "Installing GCC Stage 1..."
 echo "Installing GCC Stage 1" >> ${rootdir}/logs/gnu-build.log 2>&1
 
-if ! make -j 4 install-gcc >> ${rootdir}/logs/gnu-build.log 2>&1
+if ! make ${parallel} install-gcc >> ${rootdir}/logs/gnu-build.log 2>&1
 then
     echo "failed"
     exit 1
@@ -155,7 +169,7 @@ if ! ${rootdir}/gnu/newlib/configure \
      --localstatedir=${rootdir}/install/var \
      --target=riscv32-unknown-elf \
      --with-sysroot=${rootdir}/install/riscv32-unknown-elf/sysroot \
-     CFLAGS_FOR_TARGET="-DPREFER_SIZE_OVER_SPEED=1 -Os -march=rv32imc -mabi=ilp32" \
+     CFLAGS_FOR_TARGET="${cflags_for_target}" \
      --disable-newlib-fvwrite-in-streamio \
      --disable-newlib-fseek-optimization \
      --enable-newlib-nano-malloc \
@@ -175,7 +189,7 @@ fi
 echo -n "Building Newlib..."
 echo "Building Newlib" >> ${rootdir}/logs/gnu-build.log 2>&1
 
-if ! make -j 4 >> ${rootdir}/logs/gnu-build.log 2>&1
+if ! make ${parallel} >> ${rootdir}/logs/gnu-build.log 2>&1
 then
     echo "failed"
     exit 1
@@ -186,7 +200,7 @@ fi
 echo -n "Installing Newlib..."
 echo "Installing Newlib" >> ${rootdir}/logs/gnu-build.log 2>&1
 
-if ! make -j 4 install >> ${rootdir}/logs/gnu-build.log 2>&1
+if ! make ${parallel} install >> ${rootdir}/logs/gnu-build.log 2>&1
 then
     echo "failed"
     exit 1
@@ -232,8 +246,8 @@ if ! ${rootdir}/gnu/gcc/configure \
      --without-isl \
      --without-cloog \
      --disable-decimal-float \
-     --with-arch=rv32imac \
-     --with-abi=ilp32 \
+     --with-arch=${arch} \
+     --with-abi=${abi} \
      --enable-languages=c,c++ \
      --with-newlib \
      --disable-largefile \
@@ -249,7 +263,7 @@ fi
 echo -n "Building GCC Stage 2..."
 echo "Building GCC Stage 2" >> ${rootdir}/logs/gnu-build.log 2>&1
 
-if ! make -j 4 all >> ${rootdir}/logs/gnu-build.log 2>&1
+if ! make ${parallel} all >> ${rootdir}/logs/gnu-build.log 2>&1
 then
     echo "failed"
     exit 1
@@ -260,7 +274,7 @@ fi
 echo -n "Installing GCC Stage 2..."
 echo "Installing GCC Stage 2" >> ${rootdir}/logs/gnu-build.log 2>&1
 
-if ! make -j 4 install >> ${rootdir}/logs/gnu-build.log 2>&1
+if ! make ${parallel} install >> ${rootdir}/logs/gnu-build.log 2>&1
 then
     echo "failed"
     exit 1

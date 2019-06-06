@@ -8,6 +8,13 @@ mkdir -p build/llvm
 rm -f ${rootdir}/logs/llvm-build.log
 touch ${rootdir}/logs/llvm-build.log
 
+if [ "$(hostname)" = "longley" ]
+then
+    parallel="-j 4"
+else
+    parallel=""
+fi
+
 # Clang/LLVM
 
 cd ${rootdir}/build/llvm
@@ -33,10 +40,10 @@ else
     echo "succeeded"
 fi
 
-echo -n "Building Clang/LLVM..."
-echo "Building Clang/LLVM" >> ${rootdir}/logs/llvm-build.log 2>&1
+echo -n "Building and installing Clang/LLVM..."
+echo "Building and installing Clang/LLVM" >> ${rootdir}/logs/llvm-build.log 2>&1
 
-if ! ninja -j 4 install >> ${rootdir}/logs/llvm-build.log 2>&1
+if ! ninja ${parallel} install >> ${rootdir}/logs/llvm-build.log 2>&1
 then
     echo "failed"
     exit 1
