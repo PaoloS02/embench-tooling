@@ -3,10 +3,10 @@
 progdir="$(dirname $0)"
 topdir="$(cd ${progdir}/..; pwd)"
 
-installdir=${topdir}/install
-builddir=${topdir}/build
+installdir=${topdir}/install-arm
+builddir=${topdir}/build-arm
 logdir=${topdir}/logs
-logfile=${logdir}/gnu-build.log
+logfile=${logdir}/gnu-arm-build.log
 
 mkdir -p ${builddir}/gnu/binutils-gdb
 mkdir -p ${builddir}/gnu/gcc-stage-1
@@ -25,12 +25,13 @@ else
     parallel="-j $(nproc)"
 fi
 
-triplet=riscv32-unknown-elf
-arch=rv32imc
-abi=ilp32
+triplet=arm-none-eabi
+cpu=cortex-m4
+mode=thumb
+float=soft
 #arch=rv32emc
 #abi=ilp32e
-cflags_for_target="-DPREFER_SIZE_OVER_SPEED=1 -Os -march=${arch} -mabi=${abi}"
+cflags_for_target="-DPREFER_SIZE_OVER_SPEED=1 -Os"
 
 # Binutils/GDB
 
@@ -123,8 +124,9 @@ if ! ${topdir}/gnu/gcc/configure \
      --without-isl \
      --without-cloog \
      --disable-decimal-float \
-     --with-arch=${arch} \
-     --with-abi=${abi} \
+     --with-cpu=${cpu} \
+     --with-mode=${mode} \
+     --with-float=${float} \
      --enable-languages=c \
      --without-headers \
      --with-newlib \
@@ -251,8 +253,9 @@ if ! ${topdir}/gnu/gcc/configure \
      --without-isl \
      --without-cloog \
      --disable-decimal-float \
-     --with-arch=${arch} \
-     --with-abi=${abi} \
+     --with-cpu=${cpu} \
+     --with-mode=${mode} \
+     --with-float=${float} \
      --enable-languages=c,c++ \
      --with-newlib \
      --disable-largefile \

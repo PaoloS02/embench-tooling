@@ -1,3 +1,12 @@
+2019-06-10  Jeremy Bennett  <jeremy.bennett@embecosm.com>
+
+	* build-gnu-arm.sh: Created.
+	* build-gnu.sh: Parameterize.
+	* count-sloc.sh: Created.
+	* rv32-instr-freq-static.sh: Created.
+	* size-data.sh: Base on embench-iot.
+	* speed-data.sh: Likewise.
+
 2019-06-06  Jeremy Bennett  <jeremy.bennett@embecosm.com>
 
 	* build-llvm.sh: Provide opportunity to build from monorepo.
