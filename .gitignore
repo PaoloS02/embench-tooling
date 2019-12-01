@@ -1,2 +1,6 @@
 # Editor backup files
 *~
+# Python caches
+__pycache__/
+# Python linting
+.pylintrc
