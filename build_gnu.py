@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-# Script to build GNU tool chains for 32-bit RISC-V
+# Script to build GNU and Clang/LLVM tool chains
 
 # Copyright (C) 2019 Embecosm Limited
 #
@@ -37,7 +37,7 @@ from tooling_core import log_args
 def build_parser():
     """Build a parser for all the arguments"""
     parser = argparse.ArgumentParser(
-        description='Build a GNU tool chain for 32-bit RISC-V'
+        description='Build a GNU or Clang/LLVM tool chain'
     )
 
     # The triplet is a mandatory positional argument
@@ -48,6 +48,17 @@ def build_parser():
     )
 
     # The next set have defaults
+    parser.add_argument(
+        '--build-llvm',
+        action='store_true',
+        help='Build a LLVM compiler',
+    )
+    parser.add_argument(
+        '--build-gnu',
+        dest='build_llvm',
+        action='store_false',
+        help='Build a GNU compiler (the default)',
+    )
     parser.add_argument(
         '--builddir',
         type=str,
@@ -70,9 +81,14 @@ def build_parser():
     # The next set have defaults dependent on the triplet, and so are set
     # later.
     parser.add_argument(
-        '--arch',
+        '--gnu-arch',
         type=str,
-        help='Target architecture',
+        help='GNU target architecture',
+    )
+    parser.add_argument(
+        '--llvm-arch',
+        type=str,
+        help='LLVM target architecture',
     )
     parser.add_argument(
         '--abi',
@@ -102,15 +118,20 @@ def build_parser():
     parser.add_argument(
         '--libc',
         type=str,
-        help='Target libc (newlib or avrlibc',
+        help='Target libc (newlib or avrlibc)',
     )
     parser.add_argument(
         '--target-cflags',
         type=str,
         help='Compiler flags when building the target C library',
     )
+    parser.add_argument(
+        '--experimental',
+        action='store_true',
+        help='Build an experimental LLVM target'
+    )
 
-    # Binary flag option
+    # Binary flag options
     parser.add_argument(
         '--clean', action='store_true', help='Rebuild everything'
     )
@@ -121,23 +142,14 @@ def build_parser():
 def validate_args(args):
     """Validate and set default values of unspecified args"""
 
-    # Only deal with certain triplets
-    valid_triplets = {
-        'riscv32-unknown-elf',
-        'arm-none-eabi',
-        'arc-elf32',
-        'avr',
-    }
-    if args.triplet in valid_triplets:
-        gp['triplet'] = args.triplet
-    else:
-        log.error(f'ERROR: Invalid target triplet {args.triplet}')
-        sys.exit(1)
+    # What sort of build
+    gp['llvm'] = args.build_llvm
 
     # Dictionary of default values
     defaults = {
         'riscv32-unknown-elf' : {
-            'arch' : 'rv32imc',
+            'gnu_arch' : 'rv32imc',
+            'llvm_arch' : 'RISCV',
             'abi' : 'ilp32',
             'cpu' : None,
             'mode' : None,
@@ -145,9 +157,11 @@ def validate_args(args):
             'endian' : None,
             'libc' : 'newlib',
             'target_cflags' : '-DPREFER_SIZE_OVER_SPEED=1 -Os',
+            'experimental' : False,
         },
         'arm-none-eabi' : {
-            'arch' : None,
+            'gnu_arch' : None,
+            'llvm_arch' : 'ARM',
             'abi' : None,
             'cpu' : 'cortex-m4',
             'mode' : 'thumb',
@@ -155,9 +169,11 @@ def validate_args(args):
             'endian' : None,
             'libc' : 'newlib',
             'target_cflags' : '-DPREFER_SIZE_OVER_SPEED=1 -Os',
+            'experimental' : False,
         },
         'arc-elf32' : {
-            'arch' : None,
+            'gnu_arch' : None,
+            'llvm_arch' : 'ARC',
             'abi' : None,
             'cpu' : 'em',
             'mode' : None,
@@ -165,9 +181,11 @@ def validate_args(args):
             'endian' : 'little',
             'libc' : 'newlib',
             'target_cflags' : '-DPREFER_SIZE_OVER_SPEED=1 -Os',
+            'experimental' : False,
         },
         'avr' : {
-            'arch' : None,
+            'gnu_arch' : None,
+            'llvm_arch' : 'AVR',
             'abi' : None,
             'cpu' : None,
             'mode' : None,
@@ -175,20 +193,30 @@ def validate_args(args):
             'endian' : None,
             'libc' : 'avrlibc',
             'target_cflags' : '-DPREFER_SIZE_OVER_SPEED=1 -Os',
+            'experimental' : True,
         },
     }
+
+    if args.triplet in defaults.keys():
+        gp['triplet'] = args.triplet
+    else:
+        log.error(f'ERROR: Invalid target triplet {args.triplet}')
+        sys.exit(1)
 
     default = defaults[gp['triplet']]
 
     for arg in [
-            'arch',
+            'gnu_arch',
+            'llvm_arch',
             'abi',
             'cpu',
             'mode',
             'float',
             'endian',
             'libc',
-            'target_cflags']:
+            'target_cflags',
+            'experimental',
+    ]:
         val = getattr(args, arg)
         if val:
             gp[arg] = val
@@ -220,27 +248,29 @@ def create_builddirs(builddir, clean):
             )
             sys.exit(1)
 
-    # Create the directory and subdirectories. Usually the same, except if we
-    # are AVR
-    if 'avr' in gp['triplet']:
-        # AVR
-        bdlist = [
-            gp['bd'],
-            os.path.join(gp['bd'], 'gnu'),
-            os.path.join(gp['bd'], 'gnu', 'binutils-gdb'),
-            os.path.join(gp['bd'], 'gnu', 'gcc-stage-1'),
-            os.path.join(gp['bd'], 'gnu', 'avr-libc'),
-        ]
-    else:
-        # Everything non-AVR
-        bdlist = [
-            gp['bd'],
-            os.path.join(gp['bd'], 'gnu'),
-            os.path.join(gp['bd'], 'gnu', 'binutils-gdb'),
-            os.path.join(gp['bd'], 'gnu', 'gcc-stage-1'),
-            os.path.join(gp['bd'], 'gnu', 'gcc-stage-2'),
-            os.path.join(gp['bd'], 'gnu', 'newlib'),
+    # Create the directory and subdirectories. Everything needs binutils and
+    # for now even LLVM needs gcc, but only for libgcc.
+    bdlist = [
+        gp['bd'],
+        os.path.join(gp['bd'], 'gnu'),
+        os.path.join(gp['bd'], 'gnu', 'binutils-gdb'),
+        os.path.join(gp['bd'], 'gnu', 'gcc-stage-1'),
     ]
+
+    # Compiler build directories.
+    if gp['llvm']:
+        bdlist.append(os.path.join(gp['bd'], 'llvm'))
+
+    if not 'avr' in gp['triplet']:
+        # Stage 2 not needed for AVR LibC
+        bdlist.append(os.path.join(gp['bd'], 'gnu', 'gcc-stage-2'))
+
+    # Libraries
+    if 'avr' in gp['triplet']:
+        bdlist.append(os.path.join(gp['bd'], 'gnu', 'avr-libc'))
+    else:
+        bdlist.append(os.path.join(gp['bd'], 'gnu', 'newlib'))
+
     for subdir in bdlist:
         if not os.path.isdir(subdir):
             try:
@@ -319,8 +349,9 @@ def build_tool_stage(arglist, timeout, builddir, stage, tool, env=None):
         sys.exit(1)
 
 
-def build_tool(conf_arglist, timeouts, bdir, tool, make_targs=None, env=None):
-    """Configure, build and install a tool"""
+def build_gnu_tool(conf_arglist, timeouts, bdir, tool, make_targs=None,
+                   env=None):
+    """Configure, build and install a GNU tool"""
 
     # Configure
     build_tool_stage(
@@ -333,7 +364,7 @@ def build_tool(conf_arglist, timeouts, bdir, tool, make_targs=None, env=None):
     )
 
     # Build
-    arglist = ['make', '-j']
+    arglist = ['make', '-j',]
     if make_targs:
         for targ in make_targs:
             arglist.append(f'all-{targ}')
@@ -367,10 +398,58 @@ def build_tool(conf_arglist, timeouts, bdir, tool, make_targs=None, env=None):
     )
 
 
-def build_all_tools():
-    """Configure, build and install binutils, GDB, GCC and newlib."""
+def build_llvm(conf_arglist, timeouts, bdir, tool):
+    """Configure, build and install Clang/LLVM"""
 
-    # Binutils/GDB
+    # Configure
+    build_tool_stage(
+        arglist=conf_arglist,
+        timeout=timeouts['config'],
+        builddir=bdir,
+        stage='Configuring',
+        tool=tool
+    )
+
+    # Build and install
+    num_cpus = os.cpu_count()
+    if num_cpus:
+        num_cpus = str(num_cpus)
+    else:
+        num_cpus = '1'
+
+    arglist = ['ninja', '-j', num_cpus, 'install']
+    build_tool_stage(
+        arglist=arglist,
+        timeout=timeouts['build/install'],
+        builddir=bdir,
+        stage='Building and installing',
+        tool=tool
+    )
+
+    # Link clang and clang++. This has to be relative to be useful, so needs
+    # directory file descrptors.
+    if os.symlink in os.supports_dir_fd:
+        bindir = os.path.join(gp['id'], 'bin')
+        ifd  = os.open(bindir, os.O_RDONLY)
+
+        if os.path.exists(os.path.join(bindir, gp['triplet'] + '-clang')):
+            os.remove(gp['triplet'] + '-clang', dir_fd=ifd)
+        if os.path.exists(os.path.join(bindir, gp['triplet'] + '-clang++')):
+            os.remove(gp['triplet'] + '-clang++', dir_fd=ifd)
+
+        os.symlink('clang', gp['triplet'] + '-clang', dir_fd=ifd)
+        os.symlink('clang++', gp['triplet'] + '-clang++', dir_fd=ifd)
+    else:
+        log.warning(
+            'Warning: Unable to create symbolic links for clang/clang++'
+        )
+
+
+def build_all_tools():
+    """Configure, build and install binutils, GCC or Clang/LLVM and newlib or AVR
+       LibC."""
+
+    # Binutils (needed for GCC or Clang/LLVM)
     config_arglist = [
         os.path.join(gp['rootdir'], 'gnu', 'binutils-gdb', 'configure'),
         '--prefix=' + gp['id'],
@@ -393,11 +472,11 @@ def build_all_tools():
     ]
 
     # Add target specific options
-    for arg in ['arch', 'abi', 'cpu', 'mode', 'float', 'endian']:
+    for arg in ['gnu_arch', 'abi', 'cpu', 'mode', 'float', 'endian']:
         if gp[arg]:
             config_arglist.append(f'--with-{arg}={gp[arg]}')
 
-    build_tool(
+    build_gnu_tool(
         conf_arglist=config_arglist,
         timeouts={
             'config' : 30,
@@ -405,11 +484,53 @@ def build_all_tools():
             'install' : 10,
         },
         bdir=os.path.join(gp['bd'], 'gnu', 'binutils-gdb'),
-        tool='Binutils/GDB',
+        tool='Binutils',
         make_targs=['binutils', 'ld', 'gas']
     )
 
-    # GCC stage 1
+    if gp['llvm']:
+        # Clang/LLVM
+        if gp['experimental']:
+            target_opt = '-DLLVM_EXPERIMENTAL_TARGETS_TO_BUILD='
+        else:
+            target_opt = '-DLLVM_TARGETS_TO_BUILD='
+
+        binutils_incdir = os.path.join(
+            gp['rootdir'], 'gnu', 'binutils-gdb', 'include'
+        )
+
+        config_arglist = [
+            'cmake',
+            '-DCMAKE_BUILD_TYPE=Release',
+            '-DLLVM_OPTIMIZED_TABLEGEN=ON',
+            '-DLLVM_ENABLE_ASSERTIONS=ON',
+            '-DBUILD_SHARED_LIBS=ON',
+            '-DCMAKE_INSTALL_PREFIX=' + gp['id'],
+            target_opt + gp['llvm_arch'],
+            '-DLLVM_BINUTILS_INCDIR=' + binutils_incdir,
+            '-DLLVM_ENABLE_THREADS=OFF',
+            '-G',
+            'Ninja',
+            os.path.join(gp['rootdir'], 'llvm', 'llvm-project', 'llvm'),
+        ]
+
+        build_llvm(
+            conf_arglist=config_arglist,
+            timeouts={
+                'config' : 30,
+                'build/install' : 900,
+            },
+            bdir=os.path.join(gp['bd'], 'llvm'),
+            tool='Clang/LLVM'
+        )
+
+    # GCC stage 1. We need this at present for Clang/LLVM, but only for
+    # libgcc.
+    if gp['llvm']:
+        targs = ['target-libgcc']
+    else:
+        targs = None
+
     config_arglist = [
         os.path.join(gp['rootdir'], 'gnu', 'gcc', 'configure'),
         '--prefix=' + gp['id'],
@@ -450,23 +571,24 @@ def build_all_tools():
     ]
 
     # Add target specific options
-    for arg in ['arch', 'abi', 'cpu', 'mode', 'float', 'endian']:
+    for arg in ['gnu_arch', 'abi', 'cpu', 'mode', 'float', 'endian']:
         if gp[arg]:
             config_arglist.append(f'--with-{arg}={gp[arg]}')
 
-    for arg in ['libc']:
-        if gp[arg]:
-            config_arglist.append(f'--with-{gp[arg]}')
+        for arg in ['libc']:
+            if gp[arg]:
+                config_arglist.append(f'--with-{gp[arg]}')
 
-    build_tool(
+    build_gnu_tool(
         conf_arglist=config_arglist,
         timeouts={
             'config' : 30,
             'build' : 900,
-            'install' : 10,
+            'install' : 30,
         },
         bdir=os.path.join(gp['bd'], 'gnu', 'gcc-stage-1'),
-        tool='GCC Stage 1'
+        tool='GCC Stage 1',
+        make_targs=targs
     )
 
     # C library. Usually newlib, unless we are AVR
@@ -522,7 +644,7 @@ def build_all_tools():
             '--host=avr'
         ]
 
-        build_tool(
+        build_gnu_tool(
             conf_arglist=config_arglist,
             timeouts={
                 'config' : 120,
@@ -535,6 +657,11 @@ def build_all_tools():
         )
     else:
         # Newlib.
+        if gp['llvm']:
+            cc = gp['triplet'] + '-clang'
+        else:
+            cc = gp['triplet'] + '-gcc'
+
         config_arglist = [
             os.path.join(gp['rootdir'], 'gnu', 'newlib', 'configure'),
             '--prefix=' + gp['id'],
@@ -542,6 +669,8 @@ def build_all_tools():
             '--sysconfdir=' + os.path.join(gp['id'], 'etc'),
             '--localstatedir=' + os.path.join(gp['id'], 'var'),
             '--with-sysroot=' + os.path.join(gp['id'], gp['triplet'], 'sysroot'),
+            'AS_FOR_TARGET=' + cc,
+            'CC_FOR_TARGET=' + cc,
             'CFLAGS_FOR_TARGET=' + gp['target_cflags'],
             '--disable-newlib-fvwrite-in-streamio',
             '--disable-newlib-fseek-optimization',
@@ -554,7 +683,7 @@ def build_all_tools():
             '--enable-newlib-nano-formatted-io',
         ]
 
-        build_tool(
+        build_gnu_tool(
             conf_arglist=config_arglist,
             timeouts={
                 'config' : 30,
@@ -569,8 +698,8 @@ def build_all_tools():
     # Restore path
     os.environ['PATH'] = oldpath
 
-    # GCC stage 2. Not needed for AVR
-    if not 'avr' in gp['triplet']:
+    # GCC stage 2. Not needed for AVR or LLVM
+    if not (('avr' in gp['triplet']) or gp['llvm']):
         config_arglist = [
             os.path.join(gp['rootdir'], 'gnu', 'gcc', 'configure'),
             '--prefix=' + gp['id'],
@@ -612,7 +741,7 @@ def build_all_tools():
         ]
 
         # Add target specific options
-        for arg in ['arch', 'abi', 'cpu', 'mode', 'float', 'endian']:
+        for arg in ['gnu_arch', 'abi', 'cpu', 'mode', 'float', 'endian']:
             if gp[arg]:
                 config_arglist.append(f'--with-{arg}={gp[arg]}')
 
@@ -620,12 +749,12 @@ def build_all_tools():
             if gp[arg]:
                 config_arglist.append(f'--with-{gp[arg]}')
 
-        build_tool(
+        build_gnu_tool(
             conf_arglist=config_arglist,
             timeouts={
                 'config' : 30,
                 'build' : 900,
-                'install' : 10,
+                'install' : 30,
             },
             bdir=os.path.join(gp['bd'], 'gnu', 'gcc-stage-2'),
             tool='GCC Stage 2'
