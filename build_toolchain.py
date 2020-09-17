@@ -753,6 +753,7 @@ def create_tool_chain():
             'cmake',
             '-DCMAKE_BUILD_TYPE=Release',
             '-DCMAKE_CROSSCOMPILING=True',
+            '-DLLVM_ENABLE_PROJECTS=clang',
             '-DLLVM_OPTIMIZED_TABLEGEN=ON',
             '-DLLVM_ENABLE_ASSERTIONS=ON',
             '-DBUILD_SHARED_LIBS=ON',
