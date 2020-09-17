@@ -598,6 +598,7 @@ def create_libc():
             '--disable-newlib-io-float',
             '--enable-newlib-nano-formatted-io',
             '--enable-lite-exit',
+            '--disable-newlib-supplied-syscalls',
         ]
 
         # For LLVM need to specify clang when configuring.
