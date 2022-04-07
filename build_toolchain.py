@@ -278,14 +278,14 @@ def validate_args(args):
             'target_cflags' : '-DPREFER_SIZE_OVER_SPEED=1 -Os',
         },
         'avr' : {
-            'gnu_arch' : None,
+            'arch' : None,
             'llvm_arch' : 'AVR',
             'abi' : None,
             'cpu' : None,
             'mode' : None,
             'float' : None,
             'endian' : None,
-            'libc' : 'avrlibc',
+            'libc' : 'avr-libc',
             'experimental' : True,
             'target_cflags' : '-DPREFER_SIZE_OVER_SPEED=1 -Os',
         },
@@ -559,7 +559,7 @@ def create_libc():
         arglist = [
             os.path.join(gp['rootdir'], 'libs', 'avr-libc', 'config.guess',),
         ]
-        avr_builddir = os.path.join(gp['bd'], 'avr-libc'),
+        avr_builddir = os.path.join(gp['bd'], 'avr-libc')
         buildmc = run_command(
             arglist=arglist,
             builddir=avr_builddir,
@@ -568,7 +568,7 @@ def create_libc():
 
         # Build and install the ibrary
         arglist = [
-            os.path.join(gp['rootdir'], 'gnu', 'avr-libc', 'configure',),
+            os.path.join(gp['rootdir'], 'libs', 'avr-libc', 'configure',),
             '--prefix=' + gp['id'],
             '--build=' + buildmc,
             '--host=avr',
