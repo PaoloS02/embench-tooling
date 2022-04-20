@@ -289,6 +289,18 @@ def validate_args(args):
             'experimental' : True,
             'target_cflags' : '-DPREFER_SIZE_OVER_SPEED=1 -Os',
         },
+        'mips-elf' : {
+            'arch' : 'mips32r2',
+            'abi' : '32',
+            'cpu' : None,
+            'mode' : None,
+            'float' : None,
+            'endian' : None,
+            'llvm_arch' : 'Mips',
+            'libc' : 'newlib',
+            'experimental' : False,
+            'target_cflags' : '-DPREFER_SIZE_OVER_SPEED=1 -Os -D__GLIBC_USE\(...\)=0'
+        },
     }
 
     if not args.triplet in defaults.keys():
@@ -760,7 +772,6 @@ def create_tool_chain():
             '-DCMAKE_INSTALL_PREFIX=' + gp['id'],
             '-DLLVM_' + exp_target + 'TARGETS_TO_BUILD=' + gp['llvm_arch'],
             '-DLLVM_BINUTILS_INCDIR=' + binutils_incdir,
-            '-DLLVM_ENABLE_THREADS=OFF',
             '-G',
             'Ninja',
             os.path.join(gp['rootdir'], 'llvm', 'llvm-project', 'llvm'),
