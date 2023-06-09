@@ -561,22 +561,23 @@ def create_llvm(conf_arglist, tool_name, builddir):
 
     # Link clang and clang++. This has to be relative to be useful, so needs
     # directory file descrptors.
-    log.info(f'Linking shortcuts to {tool_name}...')
-    if os.symlink in os.supports_dir_fd:
-        bindir = os.path.join(gp['id'], 'bin')
-        ifd = os.open(bindir, os.O_RDONLY)
+    if tool_name == 'Clang/LLVM':
+        log.info(f'Linking shortcuts to {tool_name}...')
+        if os.symlink in os.supports_dir_fd:
+            bindir = os.path.join(gp['id'], 'bin')
+            ifd = os.open(bindir, os.O_RDONLY)
 
-        if os.path.exists(os.path.join(bindir, gp['triplet'] + '-clang')):
-            os.remove(gp['triplet'] + '-clang', dir_fd=ifd)
-        if os.path.exists(os.path.join(bindir, gp['triplet'] + '-clang++')):
-            os.remove(gp['triplet'] + '-clang++', dir_fd=ifd)
+            if os.path.exists(os.path.join(bindir, gp['triplet'] + '-clang')):
+                os.remove(gp['triplet'] + '-clang', dir_fd=ifd)
+            if os.path.exists(os.path.join(bindir, gp['triplet'] + '-clang++')):
+                os.remove(gp['triplet'] + '-clang++', dir_fd=ifd)
 
-        os.symlink('clang', gp['triplet'] + '-clang', dir_fd=ifd)
-        os.symlink('clang++', gp['triplet'] + '-clang++', dir_fd=ifd)
-    else:
-        log.warning(
-            'Warning: Unable to create symbolic links for clang/clang++'
-        )
+            os.symlink('clang', gp['triplet'] + '-clang', dir_fd=ifd)
+            os.symlink('clang++', gp['triplet'] + '-clang++', dir_fd=ifd)
+        else:
+            log.warning(
+                'Warning: Unable to create symbolic links for clang/clang++'
+            )
 
 
 def create_libc():
@@ -676,6 +677,37 @@ def create_libc():
             config_arglist=arglist,
             tool_name='Newlib',
             builddir=os.path.join(gp['bd'], 'newlib')
+        )
+
+    if (gp['llvm']):
+        # Build compiler-rt
+        config_arglist = [
+            'cmake',
+            '-DCMAKE_INSTALL_PREFIX=' + subprocess.check_output([gp['id'] + '/bin/clang', '-print-resource-dir']).decode("utf-8"),
+            '-DCMAKE_C_COMPILER=' + gp['id'] + '/bin/clang',
+            '-DCMAKE_CXX_COMPILER=' + gp['id'] + '/bin/clang',
+            '-DCMAKE_AR=' + gp['id'] + '/bin/llvm-ar',
+            '-DCMAKE_NM=' + gp['id'] + '/bin/llvm-nm',
+            '-DCMAKE_RANLIB=' + gp['id'] + '/bin/llvm-ranlib',
+            '-DCMAKE_C_COMPILER_TARGET=' + gp['triplet'],
+            '-DCMAKE_CXX_COMPILER_TARGET=' + gp['triplet'],
+            '-DCMAKE_ASM_COMPILER_TARGET=' + gp['triplet'],
+            '-DCMAKE_C_FLAGS=' + cflags,
+            '-DCMAKE_CXX_FLAGS=' + cflags,
+            '-DCMAKE_ASM_FLAGS=' + cflags,
+            '-DCOMPILER_RT_BAREMETAL_BUILD=ON',
+            '-DCOMPILER_RT_DEFAULT_TARGET_ONLY=ON',
+            '-DLLVM_CONFIG_PATH=' + gp['bd'] + '/llvm/bin/llvm-config',
+            '../../llvm-project/compiler-rt',
+            '-G',
+            'Ninja',
+            os.path.join(gp['rootdir'], 'llvm', 'llvm-project', 'compiler-rt'),
+        ]
+
+        create_llvm(
+            conf_arglist=config_arglist,
+            tool_name='compiler-rt',
+            builddir=os.path.join(gp['bd'], 'compiler-rt'),
         )
 
     # Restore PATH
@@ -805,6 +837,7 @@ def create_tool_chain():
             '-DCMAKE_INSTALL_PREFIX=' + gp['id'],
             '-DLLVM_' + exp_target + 'TARGETS_TO_BUILD=' + gp['llvm_arch'],
             '-DLLVM_BINUTILS_INCDIR=' + binutils_incdir,
+            '-DLLVM_DEFAULT_TARGET_TRIPLE=' + gp['triplet'],
             '-G',
             'Ninja',
             os.path.join(gp['rootdir'], 'llvm', 'llvm-project', 'llvm'),
