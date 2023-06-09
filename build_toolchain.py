@@ -159,7 +159,7 @@ def get_args():
     )
     parser.add_argument(
         '--libc',
-        choices={'newlib', 'avr-libc'},
+        choices={'newlib', 'avr-libc', 'newlib-nano'},
         help='Which C library to build',
     )
     parser.add_argument(
@@ -538,6 +538,79 @@ def create_gnu_component(config_arglist, tool_name, builddir, make_targs=None):
         timeout=gp['timeouts']['install'],
     )
 
+    if tool_name == 'Newlib nano':
+        arglist = [
+                'cp',
+                os.path.join(gp['id'], gp['triplet'], 'lib', 'libc.a'),
+                os.path.join(gp['id'], gp['triplet'], 'lib', 'libc_nano.a'),
+                ]
+
+        run_command(
+            arglist=arglist,
+            builddir=builddir,
+            timeout=gp['timeouts']['install'],
+        )
+
+        arglist = [
+                'cp',
+                os.path.join(gp['id'], gp['triplet'], 'lib', 'libm.a'),
+                os.path.join(gp['id'], gp['triplet'], 'lib', 'libm_nano.a'),
+                ]
+
+        run_command(
+            arglist=arglist,
+            builddir=builddir,
+            timeout=gp['timeouts']['install'],
+        )
+
+        arglist = [
+                'cp',
+                os.path.join(gp['id'], gp['triplet'], 'lib', 'libg.a'),
+                os.path.join(gp['id'], gp['triplet'], 'lib', 'libg_nano.a'),
+                ]
+
+        run_command(
+            arglist=arglist,
+            builddir=builddir,
+            timeout=gp['timeouts']['install'],
+        )
+
+        arglist = [
+                'cp',
+                os.path.join(gp['id'], gp['triplet'], 'lib', 'libgloss.a'),
+                os.path.join(gp['id'], gp['triplet'], 'lib', 'libgloss_nano.a'),
+                ]
+
+        run_command(
+            arglist=arglist,
+            builddir=builddir,
+            timeout=gp['timeouts']['install'],
+        )
+
+        arglist = [
+                'mkdir',
+                '-p',
+                os.path.join(gp['id'], gp['triplet'], 'include', 'newlib-nano'),
+                ]
+
+        run_command(
+            arglist=arglist,
+            builddir=builddir,
+            timeout=gp['timeouts']['install'],
+        )
+
+        arglist = [
+                'cp',
+                os.path.join(gp['id'], gp['triplet'], 'include', 'newlib.h'),
+                os.path.join(gp['id'], gp['triplet'], 'include', 'newlib-nano'),
+                ]
+
+        run_command(
+            arglist=arglist,
+            builddir=builddir,
+            timeout=gp['timeouts']['install'],
+        )
+
 
 def create_llvm(conf_arglist, tool_name, builddir):
     """Configure, build and install Clang/LLVM"""
@@ -614,6 +687,87 @@ def create_libc():
             config_arglist=arglist,
             tool_name='AVR LibC',
             builddir=avr_builddir,
+        )
+
+    elif gp['libc'] == 'newlib-nano':
+#        # Newlib nano
+#        arglist = [
+#            os.path.join(gp['rootdir'], 'libs', 'newlib', 'configure'),
+#            '--target=' + gp['triplet'],
+#            '--prefix=' + gp['id'],
+#            '--disable-newlib-fvwrite-in-streamio',
+#            '--disable-newlib-fseek-optimization',
+#            '--enable-newlib-nano-malloc',
+#            '--disable-newlib-unbuf-stream-opt',
+#            '--enable-newlib-reent-small',
+#            '--disable-newlib-wide-orient',
+#            '--enable-newlib-nano-formatted-io',
+#            '--enable-lite-exit',
+#            '--enable-newlib-global-atexit',
+#            '--disable-newlib-supplied-syscalls',
+#            '--disable-nls',
+#            'CFLAGS_FOR_TARGET=-Os -ffunction-sections -fdata-sections -mcmodel=medany',
+#            'CXXFLAGS_FOR_TARGET=-Os -ffunction-sections -fdata-sections -mcmodel=medany',
+#        ]
+        arglist = [
+            os.path.join(gp['rootdir'], 'libs', 'newlib', 'configure'),
+            '--target=' + gp['triplet'],
+            '--prefix=' + gp['id'],
+            '--sysconfdir=' + os.path.join(gp['id'], 'etc'),
+            '--localstatedir=' + os.path.join(gp['id'], 'var'),
+            '--with-sysroot=' + os.path.join(gp['id'], gp['triplet'], 'sysroot'),
+            '--disable-newlib-fvwrite-in-streamio',
+            '--disable-newlib-fseek-optimization',
+            '--enable-newlib-nano-malloc',
+            '--disable-newlib-unbuf-stream-opt',
+            '--enable-target-optspace',
+            '--enable-newlib-reent-small',
+            '--disable-newlib-wide-orient',
+            '--disable-newlib-io-float',
+            '--enable-newlib-nano-formatted-io',
+            '--enable-lite-exit',
+            '--disable-newlib-supplied-syscalls',
+        ]
+
+        # For LLVM need to specify clang when configuring.
+        if gp['llvm']:
+            arglist.append('CC_FOR_TARGET=' + gp['triplet'] + '-clang')
+            arglist.append('GCC_FOR_TARGET=' + gp['triplet'] + '-clang')
+            arglist.append('LD_FOR_TARGET=' + gp['triplet'] + '-clang')
+
+        # Construct the target C flags. How these map as target flags is in
+        # some cases target specific.
+        cflags = gp['target_cflags']
+        for opt_arg in ['arch', 'abi', 'cpu', 'endian',]:
+            if gp[opt_arg]:
+                if cflags:
+                    cflags = cflags + ' '
+                cflags = cflags + '-m' + opt_arg + '=' + gp[opt_arg]
+
+        # Should be only on arm, and only "arm" or "thumb"
+        if gp['mode']:
+            if cflags:
+                cflags = cflags + ' '
+            cflags = cflags + '-m' + gp['mode']
+
+        # Should be only on arm
+        if gp['float']:
+            if cflags:
+                cflags = cflags + ' '
+            cflags = cflags + '-mfloat-abi=' + gp['float']
+
+        # This is necessary for riscv32-unknown-elf 12.2.0 GCC compiler
+        cflags = cflags + ' -Wno-int-conversion -Wno-implicit-function-declaration'
+
+        # We must not surround the flags with quote. That's a shell syntactic
+        # delimiter, but we are already delimited.
+        arglist.append(f'CFLAGS_FOR_TARGET={cflags}')
+
+        # Build and install it
+        create_gnu_component(
+            config_arglist=arglist,
+            tool_name='Newlib nano',
+            builddir=os.path.join(gp['bd'], 'newlib-nano')
         )
 
     else:
