@@ -100,6 +100,11 @@ def get_args():
         help='The CPU to use (argument to --with-cpu)',
     )
     parser.add_argument(
+        '--isa-spec',
+        type=str,
+        help='The ISA version to use (RISC-V specific) (argument to --with-isa-spec)',
+    )
+    parser.add_argument(
         '--mode',
         help='The mode to use (argument to --with-mode for Arm)',
     )
@@ -125,7 +130,7 @@ def get_args():
     parser.add_argument(
         '--timeout-build',
         type=int,
-        default=600,
+        default=3600,
         help='Timeout for build steps in seconds',
     )
     parser.add_argument(
@@ -245,6 +250,20 @@ def validate_args(args):
             'arch' : 'rv32imc',
             'abi' : 'ilp32',
             'cpu' : None,
+            'isa_spec' : '2.2',
+            'mode' : None,
+            'float' : None,
+            'endian' : None,
+            'llvm_arch' : 'RISCV',
+            'libc' : 'newlib',
+            'experimental' : False,
+            'target_cflags' : '-DPREFER_SIZE_OVER_SPEED=1 -Os'
+        },
+        'riscv64-unknown-elf' : {
+            'arch' : 'rv64imc',
+            'abi' : 'lp64',
+            'cpu' : None,
+            'isa_spec' : None,
             'mode' : None,
             'float' : None,
             'endian' : None,
@@ -258,6 +277,7 @@ def validate_args(args):
             'llvm_arch' : 'ARM',
             'abi' : None,
             'cpu' : 'cortex-m4',
+            'isa_spec' : None,
             'mode' : 'thumb',
             'float' : 'soft',
             'endian' : None,
@@ -270,6 +290,7 @@ def validate_args(args):
             'llvm_arch' : 'ARC',
             'abi' : None,
             'cpu' : 'em',
+            'isa_spec' : None,
             'mode' : None,
             'float' : None,
             'endian' : 'little',
@@ -282,6 +303,7 @@ def validate_args(args):
             'llvm_arch' : 'AVR',
             'abi' : None,
             'cpu' : None,
+            'isa_spec' : None,
             'mode' : None,
             'float' : None,
             'endian' : None,
@@ -293,6 +315,7 @@ def validate_args(args):
             'arch' : 'mips32r2',
             'abi' : '32',
             'cpu' : None,
+            'isa_spec' : None,
             'mode' : None,
             'float' : None,
             'endian' : None,
@@ -578,7 +601,7 @@ def create_libc():
             timeout=gp['timeouts']['config'],
         ).rstrip()
 
-        # Build and install the ibrary
+        # Build and install the library
         arglist = [
             os.path.join(gp['rootdir'], 'libs', 'avr-libc', 'configure',),
             '--prefix=' + gp['id'],
@@ -591,6 +614,7 @@ def create_libc():
             tool_name='AVR LibC',
             builddir=avr_builddir,
         )
+
     else:
         # Newlib
         arglist = [
@@ -640,6 +664,9 @@ def create_libc():
                 cflags = cflags + ' '
             cflags = cflags + '-mfloat-abi=' + gp['float']
 
+        # This is necessary for riscv32-unknown-elf 12.2.0 GCC compiler
+        cflags = cflags + ' -Wno-int-conversion -Wno-implicit-function-declaration'
+
         # We must not surround the flags with quote. That's a shell syntactic
         # delimiter, but we are already delimited.
         arglist.append(f'CFLAGS_FOR_TARGET={cflags}')
@@ -685,9 +712,12 @@ def create_tool_chain():
     ]
 
     # Optional args not set for all targets
-    for opt_arg in ['arch', 'abi', 'cpu', 'mode', 'float', 'endian',]:
+    for opt_arg in ['arch', 'abi', 'cpu', 'mode', 'float', 'endian', 'isa_spec']:
         if gp[opt_arg]:
-            arglist.append(f'--with-{opt_arg}=' + gp[opt_arg])
+            if opt_arg == 'isa_spec':
+                arglist.append(f'--with-isa-spec=' + gp[opt_arg])
+            else:
+                arglist.append(f'--with-{opt_arg}=' + gp[opt_arg])
 
     # Build and install it
     create_gnu_component(
@@ -740,9 +770,12 @@ def create_tool_chain():
     ]
 
     # Optional args not set for all targets
-    for opt_arg in ['arch', 'abi', 'cpu', 'mode', 'float', 'endian',]:
+    for opt_arg in ['arch', 'abi', 'cpu', 'mode', 'float', 'endian', 'isa_spec']:
         if gp[opt_arg]:
-            arglist.append(f'--with-{opt_arg}=' + gp[opt_arg])
+            if opt_arg == 'isa_spec':
+                arglist.append(f'--with-isa-spec=' + gp[opt_arg])
+            else:
+                arglist.append(f'--with-{opt_arg}=' + gp[opt_arg])
 
     # Build and install it
     create_gnu_component(
@@ -829,9 +862,12 @@ def create_tool_chain():
         ]
 
         # Optional args not set for all targets
-        for opt_arg in ['arch', 'abi', 'cpu', 'mode', 'float', 'endian',]:
+        for opt_arg in ['arch', 'abi', 'cpu', 'mode', 'float', 'endian', 'isa_spec']:
             if gp[opt_arg]:
-                arglist.append(f'--with-{opt_arg}=' + gp[opt_arg])
+                if opt_arg == 'isa_spec':
+                    arglist.append(f'--with-isa-spec=' + gp[opt_arg])
+                else:
+                    arglist.append(f'--with-{opt_arg}=' + gp[opt_arg])
 
         # Build and install it
         create_gnu_component(
